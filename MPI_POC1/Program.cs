@@ -11,20 +11,19 @@ namespace MPI_POC1
     {
 
 
-        static void Main(string[] args)
         {
+            List<OrderCSV> _OrderCSVDetails = new List<OrderCSV>();
             OrderProcess _Process = new OrderProcess();
-            string strAccessToken = _Process.GetAUTHToken("LIVE");
-            if (strAccessToken != null && !(string.IsNullOrEmpty(strAccessToken)))
-            {
-                Console.Write("Authenticated.");
-                string str = _Process.FetchOrderDetails(strAccessToken, "LIVE", "");
-            }
-            else {
-                Console.Write("Not Authenticated.");
-            }
-            //
 
+            string strAccessToken = _Process.GetAUTHToken("LIVE");
+            if (!(String.IsNullOrEmpty(strAccessToken)))
+            {
+                bool HasMore = false;
+                do
+                {
+                    object details = _Process.GetOrderDetails("LIVE", strAccessToken, out HasMore);
+                } while (HasMore != false);
+            }
             Console.Read();
         }
     }
