@@ -1,5 +1,6 @@
-using MPI_POC1.Models;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using PROCVIEW.Model;
 using RestSharp;
 using RestSharp.Authenticators;
 using System;
@@ -84,61 +85,99 @@ namespace MPI_POC1.Config
 
         }
 
-        /// <summary>
-        /// GET ALL ORDERS
-        /// </summary>
-        /// <param name="strEnvironment"></param>
-        /// <param name="strToken"></param>
-        /// <param name="HasMore"></param>
-        /// <returns></returns>
-        public IRestResponse GetAllOrderDetails(string strEnvironment, string strToken, string HasMore)
+
+        public List<OrderCSV> GetOrderDetails(string strEnvironment, string strAccessToken, out bool HasMore)
         {
             DateTime currdate = DateTime.Now;
             string fromdate = string.Format("{0:yyyy-MM-dd}", currdate.AddDays(-40));
             string todate = string.Format("{0:yyyy-MM-dd}", currdate);
             string json = "{\"filter\":{ \"orderDate\": {\"fromDate\": \"" + fromdate + "\",\"toDate\": \"" + todate + "\"}}}";
+
             RestClient _clnt = new RestClient();
             _clnt.BaseUrl = new Uri(GetBaseURL(strEnvironment));
+
             var request = new RestSharp.RestRequest("sellers/orders/search", RestSharp.Method.POST) { RequestFormat = RestSharp.DataFormat.Json }
             .AddParameter("application/json", json, ParameterType.RequestBody);
+            request.AddHeader("Authorization", "Bearer " + Convert.ToString(strAccessToken));
 
-            request.AddHeader("Authorization", "Bearer " + Convert.ToString(strToken));
             var _Response = _clnt.Execute(request);
             string strValue = _Response.Content;
+
             int idx = strValue.IndexOf("url", 1);
             string json_result = strValue.Substring(0, (idx - 2)) + "}";
+
             MPI_POC1.OrderModel.RootObject obj = JsonConvert.DeserializeObject<MPI_POC1.OrderModel.RootObject>(json_result);
-            List<ShippmentModel.RootObject> _ShippmentList = new List<ShippmentModel.RootObject>();
+
+            List<PROCVIEW.Model.OrderCSV> _LstOrdrCsv = new List<PROCVIEW.Model.OrderCSV>();
+            foreach (var Order in obj.orderItems)
+            {
+                _LstOrdrCsv.Add(new PROCVIEW.Model.OrderCSV()
+                {
+                    OrderNumer = Order.orderItemId,
+                    PurchaseNumber = Order.orderId,
+                    PurchaseStatus = Order.status,
+                    confirmedAt = Order.orderDate,
+                    ShippmentCreatedate = Order.dispatchByDate,
+                    ProductTitle = Order.title,
+                    Sku = Order.sku,
+                    Qty = Order.quantity,
+                    MRP = Order.price,
+                    ShippingCharge = Order.priceComponents.shippingCharge,
+                    ItemTotal = Order.priceComponents.totalPrice
+                });
+            }
+
             string strList = string.Empty;
-            /*CALL TO SHIPPMENT DETAILS*/
+            foreach (var OrderInfo in _LstOrdrCsv) { strList = strList + OrderInfo.OrderNumer + ","; }
+            ShippmentModel.RootObject strShippmentDetails = JsonConvert.DeserializeObject<ShippmentModel.RootObject>(GetShippmentDetails(strList.TrimEnd(',').ToString(), strEnvironment, strAccessToken));
 
-            foreach (var Order in obj.orderItems)
+
+            var objFinal = from u in strShippmentDetails.shipments
+                           join d in _LstOrdrCsv
+                           on u.orderId equals d.PurchaseNumber
+                           select new { Update = u, Details = d };
+
+            foreach (var ShippmentDetails in objFinal)
             {
-                strList = strList + Order.orderItemId + ",";
+                ShippmentDetails.Details.ShippingAddress1 = ShippmentDetails.Update.deliveryAddress.addressLine1;
+                ShippmentDetails.Details.ShippingAddress2 = ShippmentDetails.Update.deliveryAddress.addressLine2;
+                ShippmentDetails.Details.ShippingPincode = ShippmentDetails.Update.deliveryAddress.pincode;
+                ShippmentDetails.Details.ShippingCity = ShippmentDetails.Update.deliveryAddress.city;
+                ShippmentDetails.Details.ShippingState = ShippmentDetails.Update.deliveryAddress.state;
+                ShippmentDetails.Details.BillingAddress1 = ShippmentDetails.Update.billingAddress.addressLine1;
+                ShippmentDetails.Details.BillingAddress2 = ShippmentDetails.Update.billingAddress.addressLine2;
+                ShippmentDetails.Details.BillingPincode = ShippmentDetails.Update.billingAddress.pincode;
+                ShippmentDetails.Details.BillingCity = ShippmentDetails.Update.billingAddress.city;
+                ShippmentDetails.Details.BillingState = ShippmentDetails.Update.billingAddress.state;
+                ShippmentDetails.Details.ShippmentNumber = ShippmentDetails.Update.shipmentId;
+                JObject deliveryObject = (Newtonsoft.Json.Linq.JObject)ShippmentDetails.Update.courierDetails.deliveryDetails;
+                ShippmentDetails.Details.TrackingCode = deliveryObject == null ? "" : deliveryObject["trackingId"].ToString();
+                ShippmentDetails.Details.ShippingAgentCode = deliveryObject == null ? "" : deliveryObject["vendorName"].ToString();
+
+                ShippmentDetails.Details.Purchaseinstructions = "Not Available";
+                ShippmentDetails.Details.GuestCheckout = "Not Available";
+                ShippmentDetails.Details.CustomerEmail = "Not Available";
+                ShippmentDetails.Details.CustomerPhone = "Not Available";
+                ShippmentDetails.Details.ShippmentStatus = "Not Available";
+                ShippmentDetails.Details.stockNotes = "Not Available";
+                ShippmentDetails.Details.PromotionCodes = "Not Available";
+                ShippmentDetails.Details.GiftWrap = "Not Available";
+                ShippmentDetails.Details.GiftMessage = "Not Available";
+                ShippmentDetails.Details.PromotionAmt = "Not Available";
+                ShippmentDetails.Details.PaymentMethod = "Not Available";
+                ShippmentDetails.Details.PgTransactionId = "Not Available";
+                ShippmentDetails.Details.PaymentTransactionId = "Not Available";
+
+
+                ShippmentDetails.Details.SiteGroup = "7001";
+                ShippmentDetails.Details.CustomerGroup = "NON-FA";
+                ShippmentDetails.Details.InvoiceDate = "Not Available";
+
             }
-            ShippmentModel.RootObject strShippmentDetails = JsonConvert.DeserializeObject<ShippmentModel.RootObject>(GetShippmentDetails(strList.TrimEnd(',').ToString(), strEnvironment, strToken));
-
-            /*CALL TO Get by OrderItemId API */
-            /*
-            List<MPI_POC1.OrderItemDetailsModels.RootObject> _OrderItemDetailsList = new List<OrderItemDetailsModels.RootObject>();
-            foreach (var Order in obj.orderItems)
-            {
-                MPI_POC1.OrderItemDetailsModels.RootObject objOrderItemDetails = JsonConvert.DeserializeObject<MPI_POC1.OrderItemDetailsModels.RootObject>(GetOrderByItemId(Order.orderItemId, strEnvironment, strToken));
-                _OrderItemDetailsList.Add(objOrderItemDetails);
-            }
-            */
-
-            return _Response;
-
+            HasMore = obj.hasMore;
+            return _LstOrdrCsv;
         }
 
-        /// <summary>
-        /// GET SHIPPMENT DETAILS
-        /// </summary>
-        /// <param name="OrderID"></param>
-        /// <param name="strEnvironment"></param>
-        /// <param name="strToken"></param>
-        /// <returns></returns>
         private string GetShippmentDetails(string OrderID, string strEnvironment, string strToken)
         {
             RestClient _clnt = new RestClient();
@@ -152,19 +191,6 @@ namespace MPI_POC1.Config
             return _Response.Content;
         }
 
-
-        private string GetOrderByItemId(long OrderItemID, string strEnvironment, string strToken)
-        {
-
-            RestClient _clnt = new RestClient();
-            _clnt.BaseUrl = new Uri(GetBaseURL(strEnvironment));
-            var request = new RestSharp.RestRequest("sellers/orders/{orderItemId}", RestSharp.Method.GET) { RequestFormat = RestSharp.DataFormat.Json }
-                .AddParameter("orderItemId", OrderItemID, ParameterType.UrlSegment);
-            request.AddHeader("Authorization", "Bearer " + Convert.ToString(strToken));
-
-            var _Response = _clnt.Execute(request);
-            return _Response.Content;
-        }
 
 
     }
