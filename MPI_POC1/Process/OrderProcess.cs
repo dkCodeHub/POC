@@ -25,12 +25,19 @@ namespace MPI_POC1.Process
         }
 
 
-        public string FetchOrderDetails(string strToken, string strEnvironment, string nextPage)
-        {
+        //public string FetchOrderDetails(string strToken, string strEnvironment, string nextPage)
+        //{
 
+        //    Provider _Provider = new Provider();
+        //    _Provider.GetOrderDetails(strEnvironment, strToken, nextPage);
+        //    return string.Empty;
+        //}
+
+        internal List<OrderCSV> GetOrderDetails(string strEnvironment, string strAccessToken, out bool HasMore)
+        {
             Provider _Provider = new Provider();
-            _Provider.GetAllOrderDetails(strEnvironment, strToken, nextPage);
-            return string.Empty;
+            return _Provider.GetOrderDetails(strEnvironment, strAccessToken, out HasMore);
+            
         }
     }
 }
