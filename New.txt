@@ -1,0 +1,4 @@
+http://docs.developer.amazonservices.com/en_IN/dev_guide/DG_Registering.html 
+Developer Account Number:	1666-1936-8185
+AWS Access Key ID:	AKIAJRJCAGW3O4A4UAHQ
+Secret Key:	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
