@@ -1,0 +1,33 @@
+static void Main(string[] args)
+        {
+            //Job1();
+            var policy = Policy
+                                  .Handle<DivideByZeroException>()
+                                  .Retry(3, (exception, retryCount) =>
+                                  {
+                                      Console.WriteLine("Please Log this");
+                                  });
+
+            Console.WriteLine("completed..");
+            Console.ReadLine();
+        }
+
+        private static void Job1()
+        {
+            int minInterval = 1;
+            double interval = minInterval;
+            double exponent = 1.5;
+            int maxInterval = 60;
+            int intCounter = 0;
+
+            while (intCounter <= 10)
+            {
+                if (intCounter > 10) { break; }
+                Console.WriteLine(string.Format("Sleep for {0} seconds", interval));
+                Thread.Sleep(TimeSpan.FromSeconds(interval));
+                interval = Math.Min(maxInterval, interval * exponent);
+                intCounter = intCounter + 1;
+            }
+            Console.WriteLine("exponential-back-off algo");
+            Console.ReadLine();
+        }
